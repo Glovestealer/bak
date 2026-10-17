@@ -283,9 +283,9 @@ details[open] summary { margin-bottom: 10px; }
 
 <script>
 // ---- Baklängesräknaren: ren räknelogik (inga DOM-beroenden) ----
-// Tid räknas i enheter om 1/32 dag så att alla bråk blir exakta heltal.
-const U = 32;          // en hel arbetsdag
-const MIN_CHUNK = 4;   // minsta skrivpass, 1/8 dag (ca 1 h); mindre rester används inte för skrivning
+// Tid räknas i enheter om 1/160 dag så att alla bråk (0,25, 0,75, 0,9 …) blir exakta heltal.
+const U = 160;         // en hel arbetsdag
+const MIN_CHUNK = 20;  // minsta skrivpass, 1/8 dag (ca 1 h); mindre rester används inte för skrivning
 const SIZES = ['liten', 'mellan', 'stor'];
 
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -326,6 +326,19 @@ function holidays(y) {
 }
 function holidayName(ds) { return holidays(+ds.slice(0, 4))[ds] || null; }
 function isWorkday(ds) { return dow(ds) < 5 && !holidayName(ds); }
+// Arbetstid en vardag har innan egna markeringar: [andel av dag, namn eller null].
+function dayBase(ds) {
+  if (!isWorkday(ds)) return [0, holidayName(ds)];
+  const md = ds.slice(5), w = dow(ds), E = easter(+ds.slice(0, 4));
+  if (md === '12-23' && w === 4) return [0.5, 'Dagen före julafton'];
+  if (md === '01-05') return [0.5, 'Trettondagsafton'];
+  if (md === '04-30') return w === 4 ? [0.5, 'Valborgsmässoafton'] : w <= 2 ? [0.75, 'Valborgsmässoafton'] : [0.9, null];
+  if (w === 4 && md >= '10-30' && md <= '11-05') return [0.5, 'Allhelgonaafton'];
+  if (ds === addDays(E, -3)) return [0.75, 'Skärtorsdagen'];
+  if (ds === addDays(E, 38)) return [0.75, 'Dagen före Kristi himmelsfärd'];
+  if (!isWorkday(addDays(ds, 1))) return [0.9, null]; // fredagar och andra dagar före lediga dagar
+  return [1, null];
+}
 function nextWorkday(ds) { let d = ds; while (!isWorkday(d)) d = addDays(d, 1); return d; }
 function isoWeek(ds) {
   const d = parseDs(ds); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 3);
@@ -355,7 +368,8 @@ function schedule(state, today) {
   const s = state.settings;
   const start = s.includeToday ? today : addDays(today, 1);
   const cap = new Map(), alloc = new Map(), res = {};
-  const base = ds => !isWorkday(ds) ? 0 : state.busy[ds] === 'full' ? 0 : state.busy[ds] === 'half' ? U / 2 : U;
+  // Upptagen halvdag drar av en halv dag från dagens arbetstid.
+  const base = ds => state.busy[ds] === 'full' ? 0 : Math.max(0, units(dayBase(ds)[0]) - (state.busy[ds] === 'half' ? U / 2 : 0));
   const capOf = ds => { if (!cap.has(ds)) cap.set(ds, base(ds)); return cap.get(ds); };
   const take = (ds, u, id, kind) => {
     cap.set(ds, capOf(ds) - u);
@@ -487,7 +501,7 @@ function parseText(txt, defaults) {
   return st;
 }
 
-if (typeof module !== 'undefined') module.exports = { settingsError, schedule, exportText, parseText, holidays, isWorkday, isoWeek, addDays, U };
+if (typeof module !== 'undefined') module.exports = { dayBase, settingsError, schedule, exportText, parseText, holidays, isWorkday, isoWeek, addDays, U };
 
 </script>
 <script>
@@ -632,13 +646,14 @@ if (typeof module !== 'undefined') module.exports = { settingsError, schedule, e
             const used = al.reduce((s, a) => s + a.u, 0);
             const pct = Math.min(100, Math.round(used / U * 100));
             const names = [...new Set(al.map(a => domName(byId[a.id])))];
-            const tip = (b === 'full' ? 'Upptagen heldag. ' : b === 'half' ? 'Upptagen halvdag. ' : '') +
+            const [bd, bn] = dayBase(d);
+            const tip = (bn ? bn + '. ' : '') + (bd < 1 ? 'Arbetstid ' + fmtDays(units(bd)) + '. ' : '') + (b === 'full' ? 'Upptagen heldag. ' : b === 'half' ? 'Upptagen halvdag. ' : '') +
               (al.length ? al.map(a => domName(byId[a.id]) + ': ' + (a.kind === 'k' ? 'kontroll ' : 'skrivning ') + fmtDays(a.u)).join(', ') : 'Ingen domtid inplanerad');
             const tag = b === 'full' ? '<span class="tag">Heldag</span>' : b === 'half' ? '<span class="tag">Halvdag</span>' : '';
             const past = d < TODAY;
             const el = past ? 'div' : 'button type="button" data-day="' + d + '"';
             html += '<' + el + ' class="' + cls.join(' ') + '" title="' + esc(tip) + '" aria-label="' + esc(fmt(d) + '. ' + tip) + '">' +
-              '<span class="n">' + num + '</span>' + tag +
+              '<span class="n">' + num + (bd < 1 ? ' <small>' + String(bd).replace('.', ',') + '</small>' : '') + '</span>' + tag + (bn ? '<span class="who">' + bn + '</span>' : '') +
               (names.length ? '<span class="who">' + esc(names.join(' · ')) + '</span>' : '') +
               '<span class="load"><i style="width:' + pct + '%"></i></span></' + (past ? 'div' : 'button') + '>';
           }
