@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Baklängesräknaren</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: arbetsyta i två spalter – domlistorna till vänster, kalender och inställningar till höger; en spalt på telefon. */
+:root {
+  --bg: #eceff3;
+  --surface: #ffffff;
+  --sunk: #f5f7f9;
+  --ink: #16202b;
+  --muted: #5b6776;
+  --line: #d2d8df;
+  --accent: #1d4c78;
+  --accent-soft: #dce7f2;
+  --busy: #7b8796;
+  --closed: #e1e5ea;
+  --late: #b3261e;
+  --late-soft: #fbe3e0;
+  --soon: #8a5800;
+  --soon-soft: #fbeed2;
+  --ok: #1c6a44;
+  --ok-soft: #dcefe3;
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-data: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10151b; --surface: #18202a; --sunk: #141b23; --ink: #e4e9ef; --muted: #93a0ae; --line: #2a3542;
+    --accent: #84b3e2; --accent-soft: #1c3047; --busy: #6d7a89; --closed: #222b36;
+    --late: #ff8f82; --late-soft: #3b1f1c; --soon: #e9bb5e; --soon-soft: #372b13; --ok: #74d09f; --ok-soft: #15301f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10151b; --surface: #18202a; --sunk: #141b23; --ink: #e4e9ef; --muted: #93a0ae; --line: #2a3542;
+  --accent: #84b3e2; --accent-soft: #1c3047; --busy: #6d7a89; --closed: #222b36;
+  --late: #ff8f82; --late-soft: #3b1f1c; --soon: #e9bb5e; --soon-soft: #372b13; --ok: #74d09f; --ok-soft: #15301f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 400 14px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 20px; }
+h1 { font: 600 28px/1.1 var(--f-display); letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); margin: 0; }
+.grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1020px) { .grid { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); } }
+.col { display: grid; gap: 20px; min-width: 0; }
+section { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px 18px; min-width: 0; }
+h2 { font: 600 13px/1.2 var(--f-display); text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 0 0 12px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+h2 .count { font: 500 12px var(--f-data); letter-spacing: 0; text-transform: none; }
+.hint { color: var(--muted); font-size: 13px; margin: 0; }
+.data { font-family: var(--f-data); font-variant-numeric: tabular-nums; font-size: 13px; }
+
+/* Formulär */
+label.f { display: grid; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 500; }
+input[type=text], input[type=date], input[type=number], select, textarea {
+  font: inherit; color: var(--ink); background: var(--sunk); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; min-width: 0;
+}
+input[type=date], input[type=number] { font-family: var(--f-data); font-size: 13px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button { font: 500 13px var(--f-body); cursor: pointer; border-radius: 4px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 6px 12px; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+button.primary:hover { filter: brightness(1.08); }
+button.ghost { border-color: transparent; background: transparent; color: var(--muted); padding: 4px 6px; }
+button.ghost:hover { color: var(--late); border-color: transparent; }
+.add { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.add .lab { flex: 0 1 110px; }
+.add .dat { flex: 0 1 160px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { padding: 6px 12px; cursor: pointer; font-size: 13px; color: var(--ink); background: var(--sunk); border-right: 1px solid var(--line); }
+.seg label:last-of-type { border-right: 0; }
+.seg input:checked + label { background: var(--accent); color: var(--surface); }
+.seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Tabeller */
+.tbl { overflow-x: auto; margin: 0 -18px; padding: 0 18px; }
+table { width: 100%; border-collapse: collapse; min-width: 640px; }
+th { text-align: left; font: 600 11px var(--f-display); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td input[type=text] { width: 76px; padding: 4px 6px; }
+td select { padding: 4px 4px; }
+td input[type=date] { padding: 3px 4px; }
+td .strong { font-weight: 600; }
+.pill { display: inline-block; font: 500 12px var(--f-body); padding: 2px 8px; border-radius: 999px; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.soon { background: var(--soon-soft); color: var(--soon); }
+.pill.now, .pill.late { background: var(--late-soft); color: var(--late); }
+.pill.passed { background: var(--closed); color: var(--muted); }
+.note { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+tr.is-late td:first-child { box-shadow: inset 3px 0 0 var(--late); }
+tr.is-now td:first-child { box-shadow: inset 3px 0 0 var(--late); }
+tr.is-soon td:first-child { box-shadow: inset 3px 0 0 var(--soon); }
+.empty { color: var(--muted); font-size: 13px; padding: 10px 0 2px; }
+.banner { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; background: var(--accent-soft); color: var(--ink); border-radius: 6px; padding: 10px 14px; font-size: 13px; }
+
+/* Kalender */
+.calnav { display: flex; gap: 6px; align-items: center; }
+.calnav button { padding: 3px 9px; }
+.months { display: grid; gap: 18px; }
+.month h3 { font: 600 15px var(--f-display); margin: 0 0 6px; text-transform: capitalize; }
+.mgrid { display: grid; grid-template-columns: 26px repeat(5, minmax(0, 1fr)) repeat(2, minmax(0, 0.55fr)); gap: 3px; }
+.mgrid .wd { font: 600 10.5px var(--f-display); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); text-align: center; padding-bottom: 2px; }
+.wk { font: 500 10.5px var(--f-data); color: var(--muted); display: flex; align-items: center; justify-content: center; }
+.day {
+  position: relative; min-height: 50px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface);
+  padding: 3px 4px 7px; text-align: left; display: flex; flex-direction: column; gap: 1px; overflow: hidden; color: var(--ink); font: inherit;
+}
+button.day:hover { border-color: var(--accent); }
+.day .n { font: 500 12px var(--f-data); }
+.day .who { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; z-index: 1; }
+.day .tag { font: 600 9.5px var(--f-display); text-transform: uppercase; letter-spacing: 0.05em; color: var(--surface); background: var(--busy); align-self: flex-start; padding: 0 4px; border-radius: 2px; position: relative; z-index: 1; }
+.day .load { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--sunk); }
+.day .load i { display: block; height: 100%; background: var(--accent); }
+.day.closed { background: var(--closed); border-color: transparent; color: var(--muted); }
+.day.closed .who { font-size: 9.5px; }
+.day.out { visibility: hidden; }
+.day.past { opacity: 0.45; }
+.day.today { border-color: var(--ink); border-width: 2px; padding: 2px 3px 6px; }
+.day.full::before, .day.half::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+  background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--busy) 30%, transparent) 5px 7px);
+}
+.day.half::before { bottom: 50%; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--line); background: var(--surface); position: relative; overflow: hidden; display: inline-block; }
+.sw.full, .sw.half { background: repeating-linear-gradient(135deg, var(--surface) 0 3px, color-mix(in srgb, var(--busy) 45%, var(--surface)) 3px 5px); }
+.sw.half { background: linear-gradient(var(--surface), var(--surface)) bottom / 100% 50% no-repeat, repeating-linear-gradient(135deg, var(--surface) 0 3px, color-mix(in srgb, var(--busy) 45%, var(--surface)) 3px 5px); }
+.sw.closed { background: var(--closed); border-color: transparent; }
+.sw.load { border: 0; height: 4px; width: 16px; background: var(--accent); border-radius: 0; }
+
+/* Inställningar */
+.settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }
+.settings input[type=number] { width: 100%; }
+.derived { margin-top: 10px; }
+.check { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 13px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+textarea { width: 100%; min-height: 140px; font: 12px/1.5 var(--f-data); resize: vertical; }
+.msg { font-size: 13px; margin: 0; }
+.msg.err { color: var(--late); }
+.msg.good { color: var(--ok); }
+.stack { display: grid; gap: 10px; }
+details summary { cursor: pointer; font-weight: 500; font-size: 13px; }
+details[open] summary { margin-bottom: 10px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Baklängesräknaren</h1>
+    <p class="sub" id="subline"></p>
+  </header>
+
+  <div id="banner"></div>
+
+  <div class="grid">
+    <div class="col">
+      <section aria-labelledby="h-add">
+        <h2 id="h-add">Lägg till dom</h2>
+        <form class="add" id="addForm" autocomplete="off">
+          <label class="f lab">Etikett (valfri)
+            <input type="text" id="addLabel" maxlength="16" placeholder="t.ex. B">
+          </label>
+          <div class="f" style="display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:500">Storlek
+            <div class="seg" role="radiogroup" aria-label="Storlek">
+              <input type="radio" name="size" id="sz-liten" value="liten"><label for="sz-liten">Liten</label>
+              <input type="radio" name="size" id="sz-mellan" value="mellan" checked><label for="sz-mellan">Mellan</label>
+              <input type="radio" name="size" id="sz-stor" value="stor"><label for="sz-stor">Stor</label>
+            </div>
+          </div>
+          <label class="f dat">Meddelas (lämna tomt om inget datum)
+            <input type="date" id="addDate">
+          </label>
+          <button type="submit" class="primary">Lägg till</button>
+        </form>
+      </section>
+
+      <section aria-labelledby="h-dated">
+        <h2 id="h-dated">Domar med meddelandedatum <span class="count" id="cDated"></span></h2>
+        <div class="tbl"><table>
+          <thead><tr><th>Etikett</th><th>Storlek</th><th>Meddelas</th><th>Påbörja senast</th><th>Kontroll senast</th><th>Status</th><th><span hidden>Ta bort</span></th></tr></thead>
+          <tbody id="tDated"></tbody>
+        </table></div>
+        <p class="empty" id="eDated" hidden>Inga domar med datum. Lägg till en ovan.</p>
+      </section>
+
+      <section aria-labelledby="h-open">
+        <h2 id="h-open">Domar utan meddelandedatum <span class="count" id="cOpen"></span></h2>
+        <p class="hint" style="margin-bottom:8px">Läggs i den tid som blir över, så tidigt som möjligt och i den ordning de lagts in. Sätt ett datum så flyttas domen upp.</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Etikett</th><th>Storlek</th><th>Kan påbörjas</th><th>Skrivning klar</th><th>Kontroll</th><th>Tidigast meddelande</th><th>Sätt datum</th><th><span hidden>Ta bort</span></th></tr></thead>
+          <tbody id="tOpen"></tbody>
+        </table></div>
+        <p class="empty" id="eOpen" hidden>Inga domar utan datum.</p>
+      </section>
+    </div>
+
+    <div class="col">
+      <section aria-labelledby="h-cal">
+        <h2 id="h-cal">Kalender
+          <span class="calnav">
+            <button type="button" id="calPrev" aria-label="Föregående månad">‹</button>
+            <button type="button" id="calToday">I dag</button>
+            <button type="button" id="calNext" aria-label="Nästa månad">›</button>
+          </span>
+        </h2>
+        <p class="hint" style="margin-bottom:10px">Klicka på en vardag för att växla: ledig, upptagen halvdag, upptagen heldag.</p>
+        <div class="months" id="months"></div>
+        <div class="legend">
+          <span><i class="sw"></i>Ledig</span>
+          <span><i class="sw half"></i>Upptagen halvdag</span>
+          <span><i class="sw full"></i>Upptagen heldag</span>
+          <span><i class="sw closed"></i>Helg och röd dag</span>
+          <span><i class="sw load"></i>Inplanerad domtid</span>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-set">
+        <h2 id="h-set">Kalibrering</h2>
+        <div class="settings">
+          <label class="f">Liten, skrivdagar<input type="number" id="w-liten" min="0.05" step="0.05"></label>
+          <label class="f">Mellan, skrivdagar<input type="number" id="w-mellan" min="0.05" step="0.05"></label>
+          <label class="f">Stor, skrivdagar<input type="number" id="w-stor" min="0.05" step="0.05"></label>
+          <label class="f">Kontroll, andel av skrivtid<input type="number" id="kf" min="0" max="1" step="0.05"></label>
+        </div>
+        <p class="hint derived data" id="derived"></p>
+        <p class="msg err" id="setMsg" role="status"></p>
+        <label class="check"><input type="checkbox" id="incToday"> Räkna med ledig tid i dag</label>
+      </section>
+
+      <section aria-labelledby="h-io">
+        <h2 id="h-io">Spara och flytta</h2>
+        <div class="stack">
+          <p class="msg err" id="storeWarn" role="status" hidden>Webbläsaren tillåter inte att uppgifter sparas här. Exportera som text innan du stänger sidan.</p>
+          <p class="hint" id="storeHint">Uppgifterna sparas bara i den här webbläsaren. Exportera som text för att ha en kopia eller flytta till en annan dator.</p>
+          <div class="row">
+            <button type="button" id="btnExport">Exportera</button>
+            <button type="button" id="btnImport">Importera</button>
+            <button type="button" id="btnClear" class="ghost">Rensa allt</button>
+          </div>
+          <div id="exportBox" class="stack" hidden>
+            <textarea id="exportText" readonly aria-label="Exporterad text"></textarea>
+            <div class="row">
+              <button type="button" id="btnCopy">Kopiera</button>
+              <button type="button" id="btnSave" hidden>Spara som .txt</button>
+              <span class="msg" id="exportMsg" role="status"></span>
+            </div>
+          </div>
+          <div id="importBox" class="stack" hidden>
+            <p class="hint">Välj en exporterad .txt-fil eller klistra in texten. Import ersätter allt som finns nu.</p>
+            <input type="file" id="importFile" accept=".txt,text/plain">
+            <textarea id="importText" aria-label="Text att importera" placeholder="Klistra in exporterad text här"></textarea>
+            <div class="row">
+              <button type="button" id="btnDoImport" class="primary">Läs in</button>
+              <span class="msg" id="importMsg" role="status"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Baklängesräknaren: ren räknelogik (inga DOM-beroenden) ----
+// Tid räknas i enheter om 1/32 dag så att alla bråk blir exakta heltal.
+const U = 32;          // en hel arbetsdag
+const MIN_CHUNK = 4;   // minsta skrivpass, 1/8 dag (ca 1 h); mindre rester används inte för skrivning
+const SIZES = ['liten', 'mellan', 'stor'];
+
+function pad(n) { return String(n).padStart(2, '0'); }
+function toDs(y, m, d) { return y + '-' + pad(m) + '-' + pad(d); }
+function parseDs(ds) { const p = ds.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2])); }
+function fmtDs(dt) { return toDs(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate()); }
+function addDays(ds, n) { const d = parseDs(ds); d.setUTCDate(d.getUTCDate() + n); return fmtDs(d); }
+function dow(ds) { return (parseDs(ds).getUTCDay() + 6) % 7; } // 0 = måndag
+function isValidDs(ds) { return /^\d{4}-\d{2}-\d{2}$/.test(ds) && fmtDs(parseDs(ds)) === ds; }
+
+function easter(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+  return toDs(y, month, day);
+}
+
+const holCache = {};
+// Röda dagar på vardagar samt aftnar då domstolen i praktiken är stängd.
+function holidays(y) {
+  if (holCache[y]) return holCache[y];
+  const E = easter(y), h = {};
+  h[toDs(y, 1, 1)] = 'Nyårsdagen';
+  h[toDs(y, 1, 6)] = 'Trettondedag jul';
+  h[addDays(E, -2)] = 'Långfredagen';
+  h[addDays(E, 1)] = 'Annandag påsk';
+  h[addDays(E, 39)] = 'Kristi himmelsfärdsdag';
+  h[toDs(y, 5, 1)] = 'Första maj';
+  h[toDs(y, 6, 6)] = 'Nationaldagen';
+  for (let d = 19; d <= 25; d++) { const ds = toDs(y, 6, d); if (dow(ds) === 4) h[ds] = 'Midsommarafton'; }
+  h[toDs(y, 12, 24)] = 'Julafton';
+  h[toDs(y, 12, 25)] = 'Juldagen';
+  h[toDs(y, 12, 26)] = 'Annandag jul';
+  h[toDs(y, 12, 31)] = 'Nyårsafton';
+  return (holCache[y] = h);
+}
+function holidayName(ds) { return holidays(+ds.slice(0, 4))[ds] || null; }
+function isWorkday(ds) { return dow(ds) < 5 && !holidayName(ds); }
+function nextWorkday(ds) { let d = ds; while (!isWorkday(d)) d = addDays(d, 1); return d; }
+function isoWeek(ds) {
+  const d = parseDs(ds); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 3);
+  const ys = Date.UTC(d.getUTCFullYear(), 0, 1);
+  return Math.ceil(((d - ys) / 864e5 + 1) / 7);
+}
+function workdaysBetween(a, b) { // arbetsdagar i [a, b)
+  let n = 0, d = a; while (d < b) { if (isWorkday(d)) n++; d = addDays(d, 1); } return n;
+}
+
+// Gäller både inställningsfälten och importen.
+function settingsError(s) {
+  for (const k of SIZES) if (!(s.write[k] >= 0.05 && s.write[k] <= 10)) return 'Skrivtid för ' + k + ' ska vara 0,05–10 dagar.';
+  if (!(s.kf >= 0 && s.kf <= 1)) return 'Kontrollandelen ska vara 0–1.';
+  return null;
+}
+
+function units(days) { return Math.max(0, Math.round(days * U)); }
+function domUnits(settings, size) {
+  const w = units(settings.write[size]);
+  const k = Math.round(w * settings.kf);
+  return { w, k, split: size === 'stor' };
+}
+
+// state: { settings:{write:{liten,mellan,stor}, kf, includeToday}, doms:[{id,label,size,date|null}], busy:{ds:'half'|'full'} }
+function schedule(state, today) {
+  const s = state.settings;
+  const start = s.includeToday ? today : addDays(today, 1);
+  const cap = new Map(), alloc = new Map(), res = {};
+  const base = ds => !isWorkday(ds) ? 0 : state.busy[ds] === 'full' ? 0 : state.busy[ds] === 'half' ? U / 2 : U;
+  const capOf = ds => { if (!cap.has(ds)) cap.set(ds, base(ds)); return cap.get(ds); };
+  const take = (ds, u, id, kind) => {
+    cap.set(ds, capOf(ds) - u);
+    if (!alloc.has(ds)) alloc.set(ds, []);
+    alloc.get(ds).push({ id, kind, u });
+  };
+
+  const run = (from, step, stop) => { // arbetsdagar från `from` till `stop`, närmast först
+    const o = [];
+    for (let d = from; step < 0 ? d >= stop : d <= stop; d = addDays(d, step)) if (isWorkday(d)) o.push(d);
+    return o;
+  };
+  const placeW = (days, w, id) => {
+    let rem = w; const used = [];
+    for (const d of days) {
+      if (!rem) break;
+      const t = Math.min(capOf(d), rem);
+      if (t > 0 && (t >= MIN_CHUNK || t === rem)) { take(d, t, id, 'w'); used.push(d); rem -= t; }
+    }
+    return { used: used.sort(), rem };
+  };
+  // Kontrollen läggs hel på en dag. En stor dom delas bara om hel kontroll skulle ligga längre bort än den delade.
+  const placeK = (days, k, split, id) => {
+    if (!k) return [];
+    const k1 = Math.ceil(k / 2);
+    const whole = days.findIndex(d => capOf(d) >= k);
+    const a = split && k1 < k ? days.findIndex(d => capOf(d) >= k1) : -1;
+    const b = a < 0 ? -1 : days.findIndex((d, i) => i > a && capOf(d) >= k - k1);
+    let use;
+    if (whole >= 0 && (b < 0 || whole <= b)) use = [[days[whole], k]];
+    else if (b >= 0) use = [[days[a], k1], [days[b], k - k1]];
+    else return null;
+    use.forEach(([d, u]) => take(d, u, id, 'k'));
+    return use.map(x => x[0]).sort();
+  };
+
+  // 1. Domar med meddelandedatum: så sent som möjligt, den som meddelas sist först.
+  const dated = state.doms.filter(d => d.date).slice()
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  for (const dm of dated) {
+    const { w, k, split } = domUnits(s, dm.size);
+    const r = { kind: 'dated', kDays: [], wDays: [], shortK: 0, shortW: 0 };
+    res[dm.id] = r;
+    if (dm.date < today) { r.status = 'passed'; continue; }
+
+    // Kontroll: senast arbetsdagen före meddelandet (minst en natt emellan).
+    const kd = placeK(run(addDays(dm.date, -1), -1, start), k, split, dm.id);
+    if (!kd) { r.shortK = k; r.status = 'late'; continue; }
+    r.kDays = kd;
+    // Skrivning: klar senast arbetsdagen före kontrollen (minst en natt emellan).
+    const wr = placeW(run(addDays(kd[0] || dm.date, -1), -1, start), w, dm.id);
+    r.wDays = wr.used; r.shortW = wr.rem;
+    r.start = r.wDays[0] || null;
+    r.writeEnd = r.wDays[r.wDays.length - 1] || null;
+    if (wr.rem > 0) { r.status = 'late'; continue; }
+    r.daysUntil = workdaysBetween(start, r.start);
+    r.status = r.daysUntil === 0 ? 'now' : r.daysUntil <= 3 ? 'soon' : 'ok';
+  }
+
+  // 2. Domar utan meddelandedatum: i inlagd ordning, så tidigt som möjligt i den tid som blir över.
+  const horizon = addDays(start, 400);
+  for (const dm of state.doms.filter(d => !d.date)) {
+    const { w, k, split } = domUnits(s, dm.size);
+    const r = { kind: 'open', kDays: [], wDays: [] };
+    res[dm.id] = r;
+    const wr = placeW(run(start, 1, horizon), w, dm.id);
+    r.wDays = wr.used;
+    if (wr.rem > 0) { r.status = 'late'; continue; }
+    r.start = r.wDays[0];
+    r.writeEnd = r.wDays[r.wDays.length - 1];
+    const kd = placeK(run(addDays(r.writeEnd, 1), 1, horizon), k, split, dm.id);
+    if (!kd) { r.status = 'late'; continue; }
+    r.kDays = kd;
+    r.earliest = nextWorkday(addDays(kd[kd.length - 1] || r.writeEnd, 1));
+    r.status = 'ok';
+  }
+  return { res, alloc, cap, start };
+}
+
+// ---- Export och import som läsbar text ----
+function numStr(x) { return String(Math.round(x * 10000) / 10000); }
+function exportText(state, today) {
+  const s = state.settings;
+  const lines = [
+    '# Baklängesräknaren, export ' + today,
+    '# DOM | etikett | liten/mellan/stor | meddelandedatum (ÅÅÅÅ-MM-DD) eller -',
+    '# DAG | datum | halvdag/heldag',
+    'INSTÄLLNINGAR | liten=' + numStr(s.write.liten) + ' | mellan=' + numStr(s.write.mellan) +
+      ' | stor=' + numStr(s.write.stor) + ' | kontroll=' + numStr(s.kf) + ' | idag=' + (s.includeToday ? 'ja' : 'nej'),
+  ];
+  for (const d of state.doms) lines.push('DOM | ' + (d.label || '') + ' | ' + d.size + ' | ' + (d.date || '-'));
+  for (const ds of Object.keys(state.busy).sort())
+    lines.push('DAG | ' + ds + ' | ' + (state.busy[ds] === 'full' ? 'heldag' : 'halvdag'));
+  return lines.join('\n') + '\n';
+}
+function parseNum(v) { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : NaN; }
+function parseText(txt, defaults) {
+  const st = { settings: JSON.parse(JSON.stringify(defaults)), doms: [], busy: {} };
+  const rows = txt.split(/\r?\n/);
+  let id = 1;
+  rows.forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) return;
+    const p = line.split('|').map(x => x.trim());
+    const err = msg => { throw new Error('Rad ' + (i + 1) + ': ' + msg); };
+    const tag = p[0].toUpperCase();
+    if (tag === 'INSTÄLLNINGAR') {
+      for (const kv of p.slice(1)) {
+        const [k, v] = kv.split('=').map(x => (x || '').trim());
+        if (SIZES.includes(k)) st.settings.write[k] = parseNum(v);
+        else if (k === 'kontroll') st.settings.kf = parseNum(v);
+        else if (k === 'idag') st.settings.includeToday = v !== 'nej';
+      }
+      const bad = settingsError(st.settings); if (bad) err(bad);
+    } else if (tag === 'DOM') {
+      if (p.length < 4) err('en dom behöver etikett, storlek och datum (eller -)');
+      const size = p[2].toLowerCase();
+      if (!SIZES.includes(size)) err('storleken ska vara liten, mellan eller stor');
+      const date = p[3] === '-' || p[3] === '' ? null : p[3];
+      if (date && !isValidDs(date)) err('datumet ska skrivas ÅÅÅÅ-MM-DD');
+      st.doms.push({ id: 'd' + id++, label: p[1].slice(0, 16), size, date });
+    } else if (tag === 'DAG') {
+      if (!isValidDs(p[1] || '')) err('datumet ska skrivas ÅÅÅÅ-MM-DD');
+      const v = (p[2] || '').toLowerCase();
+      if (v !== 'heldag' && v !== 'halvdag') err('ange halvdag eller heldag');
+      st.busy[p[1]] = v === 'heldag' ? 'full' : 'half';
+    } else err('okänd radtyp "' + p[0] + '"');
+  });
+  return st;
+}
+
+if (typeof module !== 'undefined') module.exports = { settingsError, schedule, exportText, parseText, holidays, isWorkday, isoWeek, addDays, U };
+
+</script>
+<script>
+(function () {
+  const KEY = 'baklangesraknaren.v1';
+  const DEFAULTS = { write: { liten: 0.25, mellan: 0.5, stor: 1.25 }, kf: 0.25, includeToday: true };
+  const WD = ['mån', 'tis', 'ons', 'tor', 'fre', 'lör', 'sön'];
+  const MO = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+  const MONTHS = ['januari', 'februari', 'mars', 'april', 'maj', 'juni', 'juli', 'augusti', 'september', 'oktober', 'november', 'december'];
+  const SIZE_NAME = { liten: 'Liten', mellan: 'Mellan', stor: 'Stor' };
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function todayDs() { const n = new Date(); return toDs(n.getFullYear(), n.getMonth() + 1, n.getDate()); }
+  let TODAY = todayDs();
+  const fmt = ds => { const d = parseDs(ds); return WD[dow(ds)] + ' ' + d.getUTCDate() + ' ' + MO[d.getUTCMonth()]; };
+  const fmtDays = u => { const v = Math.round(u / U * 100) / 100; return String(v).replace('.', ',') + (v === 1 ? ' dag' : ' dagar'); };
+  const uid = () => 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  function exampleState() {
+    const wd = n => { let d = TODAY, k = 0; while (k < n) { d = addDays(d, 1); if (isWorkday(d)) k++; } return d; };
+    const busy = {}; busy[wd(2)] = 'full'; busy[wd(3)] = 'half'; busy[wd(8)] = 'full'; busy[wd(9)] = 'full';
+    return {
+      v: 1, exDays: Object.keys(busy), settings: JSON.parse(JSON.stringify(DEFAULTS)), busy,
+      doms: [
+        { id: uid(), ex: true, label: 'Ex A', size: 'stor', date: wd(13) },
+        { id: uid(), ex: true, label: 'Ex B', size: 'mellan', date: wd(7) },
+        { id: uid(), ex: true, label: 'Ex C', size: 'liten', date: wd(5) },
+        { id: uid(), ex: true, label: 'Ex D', size: 'mellan', date: null },
+      ],
+    };
+  }
+  function load() {
+    try {
+      const st = JSON.parse(localStorage.getItem(KEY));
+      if (st && st.doms && st.settings && st.busy) {
+        if (st.example) st.doms.forEach(d => { if (/^Ex [A-D]$/.test(d.label)) d.ex = true; }); // data från första testversionen
+        delete st.example;
+        st.exDays = st.exDays || [];
+        if (settingsError(st.settings)) st.settings = JSON.parse(JSON.stringify(DEFAULTS));
+        return st;
+      }
+    } catch (e) {}
+    return null;
+  }
+  let state = load() || exampleState();
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); return true; } catch (e) { return false; } }
+  const setStore = ok => { $('storeWarn').hidden = ok; $('storeHint').hidden = !ok; };
+
+  let calOffset = 0; // månader från innevarande
+  let clearArmed = false, clearTimer = null;
+
+  const domName = dm => dm.label || (SIZE_NAME[dm.size] + (dm.date ? ' ' + fmt(dm.date) : ' utan datum'));
+  const sizeSelect = dm => '<select data-act="size" data-id="' + dm.id + '" aria-label="Storlek">' +
+    SIZES.map(s => '<option value="' + s + '"' + (s === dm.size ? ' selected' : '') + '>' + SIZE_NAME[s] + '</option>').join('') + '</select>';
+  const labelInput = dm => '<input type="text" maxlength="16" data-act="label" data-id="' + dm.id + '" value="' + esc(dm.label || '') + '" placeholder="–" aria-label="Etikett">';
+  const delBtn = dm => '<button type="button" class="ghost" data-act="del" data-id="' + dm.id + '" aria-label="Ta bort ' + esc(domName(dm)) + '">Ta bort</button>';
+  const daysList = arr => arr.length ? arr.map(fmt).join(' och ') : '–';
+
+  function render() {
+    TODAY = todayDs();
+    const out = schedule(state, TODAY);
+    const res = out.res;
+    const startNote = state.settings.includeToday ? 'från och med i dag' : 'från och med nästa arbetsdag';
+    $('subline').textContent = 'Räknat ' + startNote + ', ' + fmt(TODAY) + ' ' + parseDs(TODAY).getUTCFullYear() + ' (v. ' + isoWeek(TODAY) + ')';
+
+    $('banner').innerHTML = (state.doms.some(d => d.ex) || state.exDays.length)
+      ? '<div class="banner"><span>Listan och kalendern visar exempel så att du ser hur räkningen fungerar.</span><button type="button" id="btnNoEx">Ta bort exemplen</button></div>'
+      : '';
+
+    // Med datum, sorterat på meddelandedatum
+    const dated = state.doms.filter(d => d.date).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    $('cDated').textContent = dated.length ? dated.length + ' st' : '';
+    $('eDated').hidden = dated.length > 0;
+    $('tDated').innerHTML = dated.map(dm => {
+      const r = res[dm.id];
+      let pill, note = '';
+      if (r.status === 'passed') pill = '<span class="pill passed">Datumet har passerat</span>';
+      else if (r.status === 'late') {
+        pill = '<span class="pill late">Ryms inte</span>';
+        note = r.shortK ? 'Ingen plats för kontrollen före meddelandet' : 'Saknas ' + fmtDays(r.shortW) + ' skrivtid';
+      } else if (r.status === 'now') pill = '<span class="pill now">' + (r.start === TODAY ? 'Börja nu' : 'Börja nästa arbetsdag') + '</span>';
+      else if (r.status === 'soon') { pill = '<span class="pill soon">Snart</span>'; note = 'om ' + r.daysUntil + ' arbetsdag' + (r.daysUntil === 1 ? '' : 'ar'); }
+      else { pill = '<span class="pill ok">I tid</span>'; note = 'om ' + r.daysUntil + ' arbetsdagar'; }
+      const start = r.start ? '<span class="strong">' + fmt(r.start) + '</span>' : '–';
+      return '<tr class="is-' + r.status + '"><td>' + labelInput(dm) + '</td><td>' + sizeSelect(dm) + '</td>' +
+        '<td><input type="date" data-act="date" data-id="' + dm.id + '" value="' + dm.date + '" aria-label="Meddelandedatum"></td>' +
+        '<td class="data">' + start + '</td><td class="data">' + (r.status === 'passed' ? '–' : daysList(r.kDays)) + '</td>' +
+        '<td>' + pill + (note ? '<span class="note">' + note + '</span>' : '') + '</td><td>' + delBtn(dm) + '</td></tr>';
+    }).join('');
+
+    // Utan datum, i inlagd ordning
+    const open = state.doms.filter(d => !d.date);
+    $('cOpen').textContent = open.length ? open.length + ' st' : '';
+    $('eOpen').hidden = open.length > 0;
+    $('tOpen').innerHTML = open.map(dm => {
+      const r = res[dm.id];
+      const late = r.status === 'late';
+      return '<tr class="' + (late ? 'is-late' : '') + '"><td>' + labelInput(dm) + '</td><td>' + sizeSelect(dm) + '</td>' +
+        '<td class="data">' + (late ? '–' : fmt(r.start)) + '</td>' +
+        '<td class="data">' + (late ? '–' : fmt(r.writeEnd)) + '</td>' +
+        '<td class="data">' + (late ? '–' : daysList(r.kDays)) + '</td>' +
+        '<td class="data">' + (late ? '<span class="pill late">Ryms inte inom ett år</span>' : '<span class="strong">' + fmt(r.earliest) + '</span>') + '</td>' +
+        '<td><input type="date" data-act="date" data-id="' + dm.id + '" value="" aria-label="Sätt meddelandedatum"></td>' +
+        '<td>' + delBtn(dm) + '</td></tr>';
+    }).join('');
+
+    renderCalendar(out);
+    renderSettings();
+  }
+
+  function renderCalendar(out) {
+    const byId = {}; state.doms.forEach(d => byId[d.id] = d);
+    const t = parseDs(TODAY);
+    let html = '';
+    for (let m = 0; m < 2; m++) {
+      const first = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + calOffset + m, 1));
+      const y = first.getUTCFullYear(), mo = first.getUTCMonth();
+      const firstDs = fmtDs(first);
+      const daysInMonth = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+      html += '<div class="month"><h3>' + MONTHS[mo] + ' ' + y + '</h3><div class="mgrid"><div class="wd">v.</div>' +
+        WD.map(w => '<div class="wd">' + w + '</div>').join('');
+      let d = addDays(firstDs, -dow(firstDs));
+      const lastDs = toDs(y, mo + 1, daysInMonth);
+      while (d <= lastDs) {
+        html += '<div class="wk">' + isoWeek(d) + '</div>';
+        for (let i = 0; i < 7; i++) {
+          const inMonth = parseDs(d).getUTCMonth() === mo;
+          if (!inMonth) { html += '<div class="day out" aria-hidden="true"></div>'; d = addDays(d, 1); continue; }
+          const num = parseDs(d).getUTCDate();
+          const hol = holidayName(d);
+          const cls = ['day'];
+          if (d === TODAY) cls.push('today');
+          if (d < TODAY) cls.push('past');
+          if (!isWorkday(d)) {
+            cls.push('closed');
+            html += '<div class="' + cls.join(' ') + '"' + (hol ? ' title="' + hol + '"' : '') + '><span class="n">' + num + '</span>' + (hol ? '<span class="who">' + hol + '</span>' : '') + '</div>';
+          } else {
+            const b = state.busy[d];
+            if (b) cls.push(b);
+            const al = out.alloc.get(d) || [];
+            const used = al.reduce((s, a) => s + a.u, 0);
+            const pct = Math.min(100, Math.round(used / U * 100));
+            const names = [...new Set(al.map(a => domName(byId[a.id])))];
+            const tip = (b === 'full' ? 'Upptagen heldag. ' : b === 'half' ? 'Upptagen halvdag. ' : '') +
+              (al.length ? al.map(a => domName(byId[a.id]) + ': ' + (a.kind === 'k' ? 'kontroll ' : 'skrivning ') + fmtDays(a.u)).join(', ') : 'Ingen domtid inplanerad');
+            const tag = b === 'full' ? '<span class="tag">Heldag</span>' : b === 'half' ? '<span class="tag">Halvdag</span>' : '';
+            const past = d < TODAY;
+            const el = past ? 'div' : 'button type="button" data-day="' + d + '"';
+            html += '<' + el + ' class="' + cls.join(' ') + '" title="' + esc(tip) + '" aria-label="' + esc(fmt(d) + '. ' + tip) + '">' +
+              '<span class="n">' + num + '</span>' + tag +
+              (names.length ? '<span class="who">' + esc(names.join(' · ')) + '</span>' : '') +
+              '<span class="load"><i style="width:' + pct + '%"></i></span></' + (past ? 'div' : 'button') + '>';
+          }
+          d = addDays(d, 1);
+        }
+      }
+      html += '</div></div>';
+    }
+    $('months').innerHTML = html;
+  }
+
+  function renderSettings() {
+    const s = state.settings;
+    for (const k of SIZES) $('w-' + k).value = s.write[k];
+    $('kf').value = s.kf;
+    $('incToday').checked = !!s.includeToday;
+    const k = sz => fmtDays(Math.round(units(s.write[sz]) * s.kf));
+    $('derived').textContent = 'Kontrolltid: liten ' + k('liten') + ', mellan ' + k('mellan') + ', stor ' + k('stor') + ' (stor får delas på två dagar).';
+  }
+
+  // ---- Händelser: varje ändring läser sparat läge, ändrar en kopia, validerar, sparar och ritar sist ----
+  function mutate(fn) {
+    const next = JSON.parse(JSON.stringify(load() || state));
+    const err = fn(next) || settingsError(next.settings);
+    $('setMsg').textContent = err || '';
+    if (!err) { state = next; setStore(save()); }
+    try { render(); } catch (e) { $('banner').textContent = 'Visningsfel: ' + e.message + '. Uppgifterna är sparade. Exportera och ladda om sidan.'; }
+  }
+  const clean = v => v.trim().replace(/\|/g, '/').slice(0, 16);
+  const num = v => parseFloat(String(v).replace(',', '.'));
+
+  $('addForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const size = (document.querySelector('input[name=size]:checked') || {}).value || 'mellan';
+    const dm = { id: uid(), label: clean($('addLabel').value), size, date: $('addDate').value || null };
+    mutate(s => { s.doms.push(dm); });
+    $('addLabel').value = ''; $('addDate').value = '';
+    $('addLabel').focus();
+  });
+
+  document.addEventListener('change', e => {
+    const t = e.target, act = t.dataset && t.dataset.act;
+    if (!act) return;
+    mutate(s => {
+      const dm = s.doms.find(d => d.id === t.dataset.id);
+      if (!dm) return;
+      delete dm.ex;
+      if (act === 'label') dm.label = clean(t.value);
+      if (act === 'size') dm.size = t.value;
+      if (act === 'date') dm.date = t.value || null;
+    });
+  });
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.act === 'del') { mutate(s => { s.doms = s.doms.filter(d => d.id !== b.dataset.id); }); return; }
+    if (b.dataset.day) {
+      const ds = b.dataset.day;
+      mutate(s => {
+        s.exDays = s.exDays.filter(x => x !== ds); // en dag användaren rör räknas som hens egen
+        const cur = s.busy[ds];
+        if (!cur) s.busy[ds] = 'half'; else if (cur === 'half') s.busy[ds] = 'full'; else delete s.busy[ds];
+      });
+      const again = document.querySelector('[data-day="' + ds + '"]'); if (again) again.focus();
+      return;
+    }
+    if (b.id === 'btnNoEx') mutate(s => { s.doms = s.doms.filter(d => !d.ex); s.exDays.forEach(ds => delete s.busy[ds]); s.exDays = []; });
+  });
+
+  // Ett fält som tappar fokus ritar om sidan mellan mus ned och mus upp. Då når inget klick fram, så upprepa det på den nya knappen.
+  let pressed = null;
+  document.addEventListener('pointerdown', e => {
+    const b = e.target.closest('button');
+    pressed = b && { el: b, sel: b.dataset.day ? '[data-day="' + b.dataset.day + '"]' : b.dataset.act === 'del' ? '[data-act=del][data-id="' + b.dataset.id + '"]' : null };
+  });
+  document.addEventListener('pointerup', e => {
+    const n = pressed && pressed.sel && !pressed.el.isConnected && document.querySelector(pressed.sel);
+    pressed = null;
+    if (n && n.contains(e.target)) n.click();
+  });
+
+  $('calPrev').onclick = () => { calOffset--; render(); };
+  $('calNext').onclick = () => { calOffset++; render(); };
+  $('calToday').onclick = () => { calOffset = 0; render(); };
+
+  for (const k of SIZES) $('w-' + k).addEventListener('change', e => mutate(s => { s.settings.write[k] = num(e.target.value); }));
+  $('kf').addEventListener('change', e => mutate(s => { s.settings.kf = num(e.target.value); }));
+  $('incToday').addEventListener('change', e => mutate(s => { s.settings.includeToday = e.target.checked; }));
+
+  // Export
+  let standalone = false;
+  try { standalone = window.self === window.top; } catch (e) {}
+  $('btnSave').hidden = !standalone;
+  $('btnExport').onclick = () => {
+    $('importBox').hidden = true;
+    $('exportBox').hidden = false;
+    $('exportText').value = exportText(state, TODAY);
+    $('exportMsg').textContent = '';
+  };
+  $('btnCopy').onclick = () => {
+    const ta = $('exportText');
+    const fallback = () => { ta.focus(); ta.select(); $('exportMsg').className = 'msg'; $('exportMsg').textContent = 'Texten är markerad. Kopiera med Ctrl+C.'; };
+    try {
+      navigator.clipboard.writeText(ta.value).then(() => { $('exportMsg').className = 'msg good'; $('exportMsg').textContent = 'Kopierat.'; }, fallback);
+    } catch (e) { fallback(); }
+  };
+  $('btnSave').onclick = () => {
+    const blob = new Blob([$('exportText').value], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'domplanering-' + TODAY + '.txt';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+
+  // Import
+  $('btnImport').onclick = () => { $('exportBox').hidden = true; $('importBox').hidden = false; $('importMsg').textContent = ''; };
+  $('importFile').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { $('importText').value = rd.result; $('importMsg').className = 'msg'; $('importMsg').textContent = 'Filen är inläst. Klicka på Läs in.'; };
+    rd.readAsText(f, 'utf-8');
+  });
+  $('btnDoImport').onclick = () => {
+    try {
+      const st = parseText($('importText').value, DEFAULTS);
+      if (!st.doms.length && !Object.keys(st.busy).length) throw new Error('Texten innehåller inga domar eller dagar.');
+      schedule(st, TODAY); // provkörning: kastar om tillståndet inte går att räkna på
+      mutate(s => { s.settings = st.settings; s.doms = st.doms; s.busy = st.busy; s.exDays = []; });
+      $('importMsg').className = 'msg good';
+      $('importMsg').textContent = 'Inläst: ' + st.doms.length + ' domar och ' + Object.keys(st.busy).length + ' upptagna dagar.';
+      $('importText').value = '';
+    } catch (err) {
+      $('importMsg').className = 'msg err';
+      $('importMsg').textContent = err.message;
+    }
+  };
+
+  // Rensa allt med bekräftelse i sidan
+  $('btnClear').onclick = () => {
+    if (!clearArmed) {
+      clearArmed = true; $('btnClear').textContent = 'Klicka igen för att rensa allt';
+      clearTimer = setTimeout(() => { clearArmed = false; $('btnClear').textContent = 'Rensa allt'; }, 4000);
+      return;
+    }
+    clearTimeout(clearTimer); clearArmed = false; $('btnClear').textContent = 'Rensa allt';
+    mutate(s => { s.settings = JSON.parse(JSON.stringify(DEFAULTS)); s.doms = []; s.busy = {}; s.exDays = []; });
+  };
+
+  setStore(save());
+  render();
+  window.addEventListener('storage', e => { if (e.key === KEY) { state = load() || state; render(); } });
+  const tick = () => { if (todayDs() !== TODAY) render(); }; // sidan kan stå öppen över midnatt
+  document.addEventListener('visibilitychange', tick);
+  window.addEventListener('focus', tick);
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>
